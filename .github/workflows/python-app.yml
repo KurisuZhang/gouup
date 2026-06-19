@@ -1,0 +1,49 @@
+name: Fund Daily Push
+
+on:
+  push:
+    branches:
+      - main
+  schedule:
+    # 北京时间 12:00 / 13:00 / 14:30（UTC 04:00 / 05:00 / 06:30），工作日
+    - cron: '0 4 * * 1-5'
+    - cron: '0 5 * * 1-5'
+  workflow_dispatch:
+
+jobs:
+  run-fund-script:
+    runs-on: ubuntu-latest
+    env:
+      SERVER_KEY: ${{ secrets.SERVER_KEY }}
+      # Opt into Node 24 now to silence warnings and test compatibility
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true 
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4 # v4 is generally compatible, but keep an eye for v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v5 # v5 supports Node 20/24
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v4 # Upgraded from v3 to v4 for better Node support
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Run Fund Script
+        run: |
+          echo "=== 开始运行基金爬取推送脚本 ==="
+          python fund.py
+          echo "=== 脚本运行结束 ==="
+
+      - name: Check for errors
+        if: failure()
+        run: echo "❌ 基金推送脚本运行失败，请检查日志！"
